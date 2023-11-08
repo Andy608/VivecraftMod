@@ -10,6 +10,7 @@ public class GuiSeatedOptions extends GuiVROptionsBase {
         new VROptionEntry(VRSettings.VrOptions.X_SENSITIVITY),
         new VROptionEntry(VRSettings.VrOptions.Y_SENSITIVITY),
         new VROptionEntry(VRSettings.VrOptions.KEYHOLE),
+        new VROptionEntry(VRSettings.VrOptions.Y_KEYHOLE),
         new VROptionEntry(VRSettings.VrOptions.SEATED_HUD_XHAIR),
         new VROptionEntry(VRSettings.VrOptions.WALK_UP_BLOCKS),
         new VROptionEntry(VRSettings.VrOptions.WORLD_ROTATION_INCREMENT),

@@ -1628,6 +1628,12 @@ public class VRSettings {
                 return prefix + String.format("%.0f" + DEGREE, (float) value);
             }
         },
+        Y_KEYHOLE(true, false, 0f, 40f, 5f, 0) { // Y Keyhole
+            @Override
+            String getDisplayString(String prefix, Object value) {
+                return prefix + String.format("%.0f" + DEGREE, (float) value);
+            }
+        },
         FOV_REDUCTION(false, true), // FOV Comfort Reduction
         FOV_REDUCTION_MIN(true, false, 0.1f, 0.7f, 0.05f, 2), // FOV Reduction Size
         FOV_REDUCTION_OFFSET(true, false, 0.0f, 0.3f, 0.01f, 2), // FOV Reduction Offset

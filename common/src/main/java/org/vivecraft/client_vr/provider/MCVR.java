@@ -91,6 +91,7 @@ public abstract class MCVR {
     public float mrControllerRoll;
     protected HapticScheduler hapticScheduler;
     public float seatedRot;
+    public double seatedPitch = 0.0F;
     public float aimPitch = 0.0F;
     protected final org.vivecraft.common.utils.math.Matrix4f Neutral_HMD = new org.vivecraft.common.utils.math.Matrix4f(1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 1.62F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
     protected final org.vivecraft.common.utils.math.Matrix4f TPose_Left = new org.vivecraft.common.utils.math.Matrix4f(1.0F, 0.0F, 0.0F, 0.25F, 0.0F, 1.0F, 0.0F, 1.62F, 0.0F, 0.0F, 1.0F, 0.25F, 0.0F, 0.0F, 0.0F, 1.0F);
@@ -272,6 +273,7 @@ public abstract class MCVR {
         }
 
         if (matrix4f != null) {
+
             org.vivecraft.common.utils.math.Matrix4f matrix4f1 = new org.vivecraft.common.utils.math.Matrix4f();
             matrix4f1.M[0][0] = matrix4f.M[0][0];
             matrix4f1.M[0][1] = matrix4f.M[0][1];
@@ -289,6 +291,46 @@ public abstract class MCVR {
             matrix4f1.M[3][1] = 0.0F;
             matrix4f1.M[3][2] = 0.0F;
             matrix4f1.M[3][3] = 1.0F;
+
+            if (this.dh.vrSettings.seated/* && this.dh.vrSettings.mouseAffectsPitch*/)
+            {
+                Matrix4f m2 = new Matrix4f();
+                m2.m00 = matrix4f1.M[0][0];
+                m2.m01 = matrix4f1.M[0][1];
+                m2.m02 = matrix4f1.M[0][2];
+                m2.m03 = matrix4f1.M[0][3];
+                m2.m10 = matrix4f1.M[1][0];
+                m2.m11 = matrix4f1.M[1][1];
+                m2.m12 = matrix4f1.M[1][2];
+                m2.m13 = matrix4f1.M[1][3];
+                m2.m20 = matrix4f1.M[2][0];
+                m2.m21 = matrix4f1.M[2][1];
+                m2.m22 = matrix4f1.M[2][2];
+                m2.m23 = matrix4f1.M[2][3];
+                m2.m30 = matrix4f1.M[3][0];
+                m2.m31 = matrix4f1.M[3][1];
+                m2.m32 = matrix4f1.M[3][2];
+                m2.m33 = matrix4f1.M[3][3];
+                m2.rotate((float) this.seatedPitch, new Vector3f(1.0F, 0.0F, 0.0F));
+
+                matrix4f1.M[0][0] = m2.m00;
+                matrix4f1.M[0][1] = m2.m01;
+                matrix4f1.M[0][2] = m2.m02;
+                matrix4f1.M[0][3] = m2.m03;
+                matrix4f1.M[1][0] = m2.m10;
+                matrix4f1.M[1][1] = m2.m11;
+                matrix4f1.M[1][2] = m2.m12;
+                matrix4f1.M[1][3] = m2.m13;
+                matrix4f1.M[2][0] = m2.m20;
+                matrix4f1.M[2][1] = m2.m21;
+                matrix4f1.M[2][2] = m2.m22;
+                matrix4f1.M[2][3] = m2.m23;
+                matrix4f1.M[3][0] = m2.m30;
+                matrix4f1.M[3][1] = m2.m31;
+                matrix4f1.M[3][2] = m2.m32;
+                matrix4f1.M[3][3] = m2.m33;
+            }
+
             return org.vivecraft.common.utils.math.Matrix4f.multiply(this.hmdRotation, matrix4f1);
         } else {
             return this.hmdRotation;
@@ -599,13 +641,16 @@ public abstract class MCVR {
                     float f4 = ((float) Math.abs(d0) - f2) / (f / 2.0F - f2);
                     double d3 = this.mc.mouseHandler.xpos();
 
+                    // If the mouse is on the left side of the screen...
                     if (d0 < (double) (-f2)) {
                         this.seatedRot += f3 * f4;
                         this.seatedRot %= 360.0F;
                         this.hmdForwardYaw = (float) Math.toDegrees(Math.atan2(vec31.x, vec31.z));
                         d3 = j;
                         d0 = -f2;
-                    } else if (d0 > (double) f2) {
+                    }
+                    // If the mouse is on the right side of the screen...
+                    else if (d0 > (double) f2) {
                         this.seatedRot -= f3 * f4;
                         this.seatedRot %= 360.0F;
                         this.hmdForwardYaw = (float) Math.toDegrees(Math.atan2(vec31.x, vec31.z));
@@ -614,13 +659,43 @@ public abstract class MCVR {
                     }
 
                     double d4 = 0.5D * (double) this.dh.vrSettings.ySensitivity;
+
+                    //                    float verticalKeyhole = this.dh.vrSettings.keyholeY;
+//                    float verticalKeyhole = 0.0F;
+//                    float verticalUp = (int) ((double) (-verticalKeyhole + f / 2.0F) * (double) this.mc.getWindow().getScreenHeight() / (double) f) + 1;
+//                    float verticalDown = (int) ((double) (verticalKeyhole + f / 2.0F) * (double) this.mc.getWindow().getScreenHeight() / (double) f) - 1;
+//                    double verticalRatio = this.mc.mouseHandler.ypos() / (double) this.mc.getWindow().getScreenHeight() * (double) f - (double) (f / 2.0F);
+//                    float verticalRatioNormalized = ((float) Math.abs(verticalRatio) - verticalKeyhole) / (f / 2.0F - verticalKeyhole);
+//                    double mouseYPos = this.mc.mouseHandler.ypos();
+//
+//                    if (verticalRatio < (double) (-verticalKeyhole))
+//                    {
+//                        this.seatedPitch += d4 * verticalRatioNormalized;
+//                        mouseYPos = verticalUp;
+//                        verticalRatio = -verticalKeyhole;
+//                    }
+//                    else if (verticalRatio > (double) (verticalKeyhole))
+//                    {
+//                        this.seatedPitch -= d4 * verticalRatioNormalized;
+//                        mouseYPos = verticalDown;
+//                        verticalRatio = verticalKeyhole;
+//                    }
+
+
                     d2 = (double) this.aimPitch + d1 * d4;
                     d2 = Mth.clamp(d2, -89.9D, 89.9D);
                     double screenX = d3 * (((WindowExtension) (Object) this.mc.getWindow()).vivecraft$getActualScreenWidth() / (double) this.mc.getWindow().getScreenWidth());
                     double screenY = (i * 0.5F) * (((WindowExtension) (Object) this.mc.getWindow()).vivecraft$getActualScreenHeight() / (double) this.mc.getWindow().getScreenHeight());
+//                    double screenY = (mouseYPos) * (((WindowExtension) (Object) this.mc.getWindow()).vivecraft$getActualScreenHeight() / (double) this.mc.getWindow().getScreenHeight());
                     InputSimulator.setMousePos(screenX, screenY);
                     GLFW.glfwSetCursorPos(this.mc.getWindow().getWindow(), screenX, screenY);
+
+                    this.seatedPitch = Math.toRadians(-d2);
+                    // Rotate arm vertically
+//                    matrix4f.rotate((float) Math.toRadians(-d2), new Vector3f(1.0F, 0.0F, 0.0F));
                     matrix4f.rotate((float) Math.toRadians(-d2), new Vector3f(1.0F, 0.0F, 0.0F));
+
+                    // Rotate body horizontally
                     matrix4f.rotate((float) Math.toRadians(-180.0D + d0 - (double) this.hmdForwardYaw), new Vector3f(0.0F, 1.0F, 0.0F));
                 }
 
