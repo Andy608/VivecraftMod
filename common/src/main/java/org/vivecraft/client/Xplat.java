@@ -4,6 +4,8 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import dev.architectury.injectables.annotations.ExpectPlatform;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSpecialEffects;
@@ -25,6 +27,18 @@ public interface Xplat {
      * <a href="https://plugins.jetbrains.com/plugin/16210-architectury">You should also get the IntelliJ plugin to help with @ExpectPlatform.</a>
      */
 
+    enum ModLoader{
+        FABRIC("fabric"),
+        FORGE("forge"),
+        NEOFORGE("neoforge");
+
+        public final String name;
+
+        ModLoader(String name) {
+            this.name = name;
+        }
+    }
+
     @ExpectPlatform
     static boolean isModLoaded(String name) {
         return false;
@@ -41,8 +55,8 @@ public interface Xplat {
     }
 
     @ExpectPlatform
-    static String getModloader() {
-        return "";
+    static ModLoader getModloader() {
+        throw new AssertionError();
     }
 
     @ExpectPlatform
@@ -83,5 +97,10 @@ public interface Xplat {
     @ExpectPlatform
     static BiomeSpecialEffects getBiomeEffects(Biome biome) {
         return null;
+    }
+
+    @ExpectPlatform
+    static double getItemEntityReach(double baseRange, ItemStack itemStack, EquipmentSlot slot) {
+        return 0;
     }
 }

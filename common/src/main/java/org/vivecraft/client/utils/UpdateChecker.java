@@ -45,7 +45,7 @@ public class UpdateChecker {
         }
 
         try {
-            String apiURL = "https://api.modrinth.com/v2/project/vivecraft/version?loaders=[%22" + Xplat.getModloader() + "%22]&game_versions=[%22" + SharedConstants.VERSION_STRING + "%22]";
+            String apiURL = "https://api.modrinth.com/v2/project/vivecraft/version?loaders=[%22" + Xplat.getModloader().name + "%22]&game_versions=[%22" + SharedConstants.VERSION_STRING + "%22]";
             HttpURLConnection conn = (HttpURLConnection) new URL(apiURL).openConnection();
             // 10 seconds read and connect timeout
             conn.setConnectTimeout(10000);
@@ -76,7 +76,7 @@ public class UpdateChecker {
             // sort the versions, modrinth doesn't guarantee them to be sorted.
             Collections.sort(versions);
 
-            String currentVersionNumber = Xplat.getModVersion() + "-" + Xplat.getModloader();
+            String currentVersionNumber = Xplat.getModVersion() + "-" + Xplat.getModloader().name;
             Version current = new Version(currentVersionNumber, currentVersionNumber, "");
 
             for (Version v : versions) {
@@ -121,19 +121,20 @@ public class UpdateChecker {
             this.fullVersion = version;
             this.changelog = changelog;
             String[] parts = version_number.split("-");
-            if (parts.length > 3) {
+            int viveVersionIndex = parts.length - 2;
+            // parts should be [mc version]-(pre/rc)-[vive version]-(vive a/b/test)-[mod loader]
+            if (!parts[viveVersionIndex].contains(".")) {
+                viveVersionIndex = parts.length - 3;
                 // prerelease
-                if (parts[2].matches("a\\d+")) {
-                    alpha = Integer.parseInt(parts[2].replaceAll("\\D+", ""));
-                } else if (parts[2].matches("b\\d+")) {
-                    beta = Integer.parseInt(parts[2].replaceAll("\\D+", ""));
+                if (parts[parts.length - 1].matches("a\\d+")) {
+                    alpha = Integer.parseInt(parts[parts.length - 1].replaceAll("\\D+", ""));
+                } else if (parts[parts.length - 1].matches("b\\d+")) {
+                    beta = Integer.parseInt(parts[parts.length - 1].replaceAll("\\D+", ""));
                 } else {
                     featureTest = true;
                 }
             }
-            // account for old version, without MC version prefix
-            int index = parts.length > 1 ? 1 : 0;
-            String[] ints = parts[index].split("\\.");
+            String[] ints = parts[viveVersionIndex].split("\\.");
             // remove all letters, since stupid me put a letter in one version
             major = Integer.parseInt(ints[0].replaceAll("\\D+", ""));
             minor = Integer.parseInt(ints[1].replaceAll("\\D+", ""));

@@ -9,11 +9,14 @@ import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.ModelBakery;
 import net.minecraft.core.BlockPos;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSpecialEffects;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.material.FluidState;
+import org.vivecraft.client.Xplat;
 import org.vivecraft.fabric.mixin.world.level.biome.BiomeAccessor;
 
 import java.nio.file.Path;
@@ -32,8 +35,8 @@ public class XplatImpl {
         return FabricLoader.getInstance().getEnvironmentType().equals(EnvType.SERVER);
     }
 
-    public static String getModloader() {
-        return "fabric";
+    public static Xplat.ModLoader getModloader() {
+        return Xplat.ModLoader.FABRIC;
     }
 
     public static String getModVersion() {
@@ -93,5 +96,9 @@ public class XplatImpl {
 
     public static BiomeSpecialEffects getBiomeEffects(Biome biome) {
         return biome.getSpecialEffects();
+    }
+
+    public static double getItemEntityReach(double baseRange, ItemStack itemStack, EquipmentSlot slot) {
+        return baseRange;
     }
 }

@@ -25,6 +25,7 @@ import org.vivecraft.client_vr.settings.AutoCalibration;
 import org.vivecraft.client_vr.settings.VRSettings;
 import org.vivecraft.common.CommonDataHolder;
 import org.vivecraft.common.VRServerPerms;
+import org.vivecraft.common.network.BufferSerializable;
 import org.vivecraft.common.network.CommonNetworkHelper;
 import org.vivecraft.common.network.VrPlayerState;
 
@@ -51,14 +52,14 @@ public class ClientNetworking {
     public static boolean needsReset = true;
 
     public static ServerboundCustomPayloadPacket getVivecraftClientPacket(CommonNetworkHelper.PacketDiscriminators command, byte[] payload) {
-        FriendlyByteBuf friendlybytebuf = new FriendlyByteBuf(Unpooled.buffer());
-        friendlybytebuf.writeByte(command.ordinal());
-        friendlybytebuf.writeBytes(payload);
-        return new ServerboundCustomPayloadPacket(CommonNetworkHelper.CHANNEL, friendlybytebuf);
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
+        buffer.writeByte(command.ordinal());
+        buffer.writeBytes(payload);
+        return new ServerboundCustomPayloadPacket(CommonNetworkHelper.CHANNEL, buffer);
     }
 
     public static ServerboundCustomPayloadPacket createVRActivePacket(boolean vrActive) {
-        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         buffer.writeByte(CommonNetworkHelper.PacketDiscriminators.IS_VR_ACTIVE.ordinal());
         buffer.writeBoolean(vrActive);
         return new ServerboundCustomPayloadPacket(CommonNetworkHelper.CHANNEL, buffer);
@@ -73,7 +74,16 @@ public class ClientNetworking {
         serverAllowsCrawling = false;
         serverAllowsVrSwitching = false;
         usedNetworkVersion = -1;
-        //DataHolder.getInstance().vrSettings.overrides.resetAll(); move to mixin
+
+        // clear VR player data
+        VRPlayersClient.clear();
+        // clear teleport
+        VRServerPerms.INSTANCE.setTeleportSupported(false);
+        if (VRState.vrInitialized) {
+            ClientDataHolderVR.getInstance().vrPlayer.setTeleportOverride(false);
+        }
+        // clear server overrides
+        ClientDataHolderVR.getInstance().vrSettings.overrides.resetAll();
     }
 
     public static void sendVersionInfo() {
@@ -129,22 +139,34 @@ public class ClientNetworking {
         VRPlayersClient.getInstance().Update(Minecraft.getInstance().player.getGameProfile().getId(), vrPlayerState, worldScale, f1 / 1.52F, true);
     }
 
+    private static byte[] serializeToArray(BufferSerializable object, byte[] additionalData) {
+        FriendlyByteBuf tempBuffer = new FriendlyByteBuf(Unpooled.buffer());
+        if (additionalData != null) {
+            tempBuffer.writeBytes(additionalData);
+        }
+        object.serialize(tempBuffer);
+        byte[] buffer = new byte[tempBuffer.readableBytes()];
+        tempBuffer.readBytes(buffer);
+        tempBuffer.release();
+        return buffer;
+    }
+
     public static ServerboundCustomPayloadPacket createVrPlayerStatePacket(VrPlayerState vrPlayerState) {
-        var buffer = new FriendlyByteBuf(Unpooled.buffer());
+        FriendlyByteBuf buffer = new FriendlyByteBuf(Unpooled.buffer());
         buffer.writeByte(CommonNetworkHelper.PacketDiscriminators.VR_PLAYER_STATE.ordinal());
         vrPlayerState.serialize(buffer);
         return new ServerboundCustomPayloadPacket(CommonNetworkHelper.CHANNEL, buffer);
     }
 
     public static void sendLegacyPackets(ClientPacketListener connection, VrPlayerState vrPlayerState) {
-        // left controller packet
+        // main controller packet
         FriendlyByteBuf controller0Buffer = new FriendlyByteBuf(Unpooled.buffer());
         controller0Buffer.writeByte(CommonNetworkHelper.PacketDiscriminators.CONTROLLER0DATA.ordinal());
         controller0Buffer.writeBoolean(ClientDataHolderVR.getInstance().vrSettings.reverseHands);
         vrPlayerState.controller0().serialize(controller0Buffer);
         connection.send(new ServerboundCustomPayloadPacket(CommonNetworkHelper.CHANNEL, controller0Buffer));
 
-        // right controller packet
+        // offhand controller packet
         FriendlyByteBuf controller1Buffer = new FriendlyByteBuf(Unpooled.buffer());
         controller1Buffer.writeByte(CommonNetworkHelper.PacketDiscriminators.CONTROLLER1DATA.ordinal());
         controller1Buffer.writeBoolean(ClientDataHolderVR.getInstance().vrSettings.reverseHands);
@@ -157,6 +179,10 @@ public class ClientNetworking {
         headBuffer.writeBoolean(ClientDataHolderVR.getInstance().vrSettings.seated);
         vrPlayerState.hmd().serialize(headBuffer);
         connection.send(new ServerboundCustomPayloadPacket(CommonNetworkHelper.CHANNEL, headBuffer));
+    }
+
+    public static boolean isThirdPersonItems() {
+        return ClientDataHolderVR.getInstance().vrSettings.overrides.getSetting(VRSettings.VrOptions.THIRDPERSON_ITEMTRANSFORMS).getBoolean();
     }
 
     public static boolean isLimitedSurvivalTeleport() {

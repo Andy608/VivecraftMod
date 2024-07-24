@@ -9,6 +9,7 @@ import net.minecraft.Util;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.ClientLanguage;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.Vec3;
@@ -781,19 +782,30 @@ public class MCOpenVR extends MCVR {
             OpenVR.create(token);
         }
 
-        if (OpenVR.VRSystem != null && !this.isError()) {
-            System.out.println("OpenVR System Initialized OK.");
-            this.hmdTrackedDevicePoses = TrackedDevicePose.calloc(64);
-            this.poseMatrices = new Matrix4f[64];
-
-            for (int i = 0; i < this.poseMatrices.length; ++i) {
-                this.poseMatrices[i] = new Matrix4f();
+        // check that the needed openvr stuff actually initialized, those can fail when using outdated steamvr
+        if (OpenVR.VRApplications == null ||
+            OpenVR.VRCompositor == null ||
+            OpenVR.VRInput == null ||
+            OpenVR.VRRenderModels == null ||
+            OpenVR.VRSystem == null ||
+            this.isError())
+        {
+            if (this.isError()) {
+                throw new RuntimeException(VR.VR_GetVRInitErrorAsEnglishDescription(this.getError()));
+            } else {
+                throw new RuntimeException(I18n.get("vivecraft.messages.outdatedsteamvr"));
             }
-
-            this.initSuccess = true;
-        } else {
-            throw new RuntimeException(VR.VR_GetVRInitErrorAsEnglishDescription(this.getError()));
         }
+
+        VRSettings.logger.info("OpenVR System Initialized OK.");
+        this.hmdTrackedDevicePoses = TrackedDevicePose.calloc(64);
+        this.poseMatrices = new Matrix4f[64];
+
+        for (int i = 0; i < this.poseMatrices.length; ++i) {
+            this.poseMatrices[i] = new Matrix4f();
+        }
+
+        this.initSuccess = true;
     }
 
     public boolean postinit() throws RenderConfigException {
@@ -827,23 +839,17 @@ public class MCOpenVR extends MCVR {
 //    }
 
     private void initOpenVRCompositor() {
-        if (OpenVR.VRSystem != null) {
-            VRCompositor_SetTrackingSpace(1);
-            try (MemoryStack stack = MemoryStack.stackPush()) {
-                var pointer = stack.calloc(20);
-                System.out.println("TrackingSpace: " + VRCompositor_GetTrackingSpace());
-                VRSystem_GetStringTrackedDeviceProperty(0, 1005, pointer, this.hmdErrorStore);
-                String s = memUTF8NullTerminated(pointer);
-                System.out.println("Device manufacturer is: " + s);
-                this.detectedHardware = HardwareType.fromManufacturer(s);
-            }
-            this.dh.vrSettings.loadOptions();
-            VRHotkeys.loadExternalCameraConfig();
+        VRCompositor_SetTrackingSpace(1);
+        try (MemoryStack stack = MemoryStack.stackPush()) {
+            var pointer = stack.calloc(20);
+            VRSettings.logger.info("TrackingSpace: {}", VRCompositor_GetTrackingSpace());
+            VRSystem_GetStringTrackedDeviceProperty(0, 1005, pointer, this.hmdErrorStore);
+            String s = memUTF8NullTerminated(pointer);
+            VRSettings.logger.info("Device manufacturer is: {}", s);
+            this.detectedHardware = HardwareType.fromManufacturer(s);
         }
-
-        if (OpenVR.VRCompositor == null) {
-            System.out.println("Skipping VR Compositor...");
-        }
+        this.dh.vrSettings.loadOptions();
+        VRHotkeys.loadExternalCameraConfig();
 
         this.texBounds.uMax(1.0F);
         this.texBounds.uMin(0.0F);
@@ -855,8 +861,32 @@ public class MCOpenVR extends MCVR {
         this.texType1.eColorSpace(VR.EColorSpace_ColorSpace_Gamma);
         this.texType1.eType(VR.ETextureType_TextureType_OpenGL);
         this.texType1.handle(-1);
-        System.out.println("OpenVR Compositor initialized OK.");
+        VRSettings.logger.info("OpenVR Compositor initialized OK.");
     }
+
+    private void checkPathValid(String path, String knownError, boolean alwaysThrow) throws RenderConfigException {
+        String pathFormatted = "";
+        boolean hasInvalidChars = false;
+        for (char c : path.toCharArray()) {
+            if (c > 127) {
+                hasInvalidChars = true;
+                pathFormatted += "§c" + c + "§r";
+            } else {
+                pathFormatted += c;
+            }
+        }
+
+        if (hasInvalidChars || alwaysThrow) {
+            String error = knownError + (hasInvalidChars ? "\nInvalid characters in path: \n" : "\n");
+            System.out.println(error + path);
+            if (hasInvalidChars) {
+                throw new RenderConfigException(knownError, Component.translatable("vivecraft.messages.steamvrInvalidCharacters", pathFormatted));
+            } else {
+                throw new RenderConfigException(knownError, Component.empty().append(error).append(pathFormatted));
+            }
+        }
+    }
+
 
     private void installApplicationManifest(boolean force) throws RenderConfigException {
         File file1 = new File("openvr/vivecraft.vrmanifest");
@@ -881,6 +911,9 @@ public class MCOpenVR extends MCVR {
 
             System.out.println("Appkey: " + s);
 
+            // check if path is valid always, since if the application was already installed, it will not check it again
+            checkPathValid(file1.getAbsolutePath(), "Failed to install application manifest", false);
+
             if (!force && VRApplications_IsApplicationInstalled(s)) {
                 System.out.println("Application manifest already installed");
             } else {
@@ -888,21 +921,7 @@ public class MCOpenVR extends MCVR {
 
                 if (i != 0) {
                     // application needs to be installed, so abort
-                    String pathFormatted = "";
-                    boolean hasInvalidChars = false;
-                    for (char c : file1.getAbsolutePath().toCharArray()) {
-                        if (c > 127) {
-                            hasInvalidChars = true;
-                            pathFormatted += "§c" + c + "§r";
-                        } else {
-                            pathFormatted += c;
-                        }
-                    }
-
-                    String error = VRApplications_GetApplicationsErrorNameFromEnum(i) + (hasInvalidChars ? "\nInvalid characters in path: \n" : "\n");
-                    System.out.println("Failed to install application manifest: " + error + file1.getAbsolutePath());
-
-                    throw new RenderConfigException("Failed to install application manifest", Component.empty().append(error).append(pathFormatted));
+                    checkPathValid(file1.getAbsolutePath(), "Failed to install application manifest: " + VRApplications_GetApplicationsErrorNameFromEnum(i), true);
                 }
 
                 System.out.println("Application manifest installed successfully");
@@ -964,11 +983,14 @@ public class MCOpenVR extends MCVR {
         }
     }
 
-    private void loadActionManifest() {
-        int i = VRInput_SetActionManifestPath((new File("openvr/input/action_manifest.json")).getAbsolutePath());
+    private void loadActionManifest() throws RenderConfigException {
+        String actionsPath = (new File("openvr/input/action_manifest.json")).getAbsolutePath();
+        // check if path is valid for steamvr, since it would just silently fail
+        checkPathValid(actionsPath, "Failed to install action manifest", false);
+        int i = VRInput_SetActionManifestPath(actionsPath);
 
         if (i != 0) {
-            throw new RuntimeException("Failed to load action manifest: " + getInputErrorName(i));
+            throw new RenderConfigException("Failed to load action manifest", Component.literal(getInputErrorName(i)));
         }
     }
 
@@ -1375,5 +1397,18 @@ public class MCOpenVR extends MCVR {
     public boolean isActive() {
         int activityLevel = VRSystem_GetTrackedDeviceActivityLevel(0);
         return activityLevel == EDeviceActivityLevel_k_EDeviceActivityLevel_UserInteraction || activityLevel == EDeviceActivityLevel_k_EDeviceActivityLevel_UserInteraction_Timeout;
+    }
+
+    @Override
+    public float getIPD() {
+        return VRSystem_GetFloatTrackedDeviceProperty(k_unTrackedDeviceIndex_Hmd, ETrackedDeviceProperty_Prop_UserIpdMeters_Float, this.hmdErrorStore);
+    }
+
+    /**
+     * this should query the actual name from the runtime, but openvr doesn't seem to have an api for that
+     */
+    @Override
+    public String getRuntimeName() {
+        return "SteamVR";
     }
 }
